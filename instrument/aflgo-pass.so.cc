@@ -178,7 +178,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     return false;
   }
 
-  std::list<std::string> targets;
+  std::list<std::string> targets; // list of targets from BBtargets.txt
   std::map<std::string, int> bb_to_dis;
   std::vector<std::string> basic_blocks;
 
@@ -274,12 +274,16 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   int inst_blocks = 0;
 
+  std::list<std::string> used_targets;
+
   if (is_aflgo_preprocessing) {
 
     std::ofstream bbnames(OutDirectory + "/BBnames.txt", std::ofstream::out | std::ofstream::app);
     std::ofstream bbcalls(OutDirectory + "/BBcalls.txt", std::ofstream::out | std::ofstream::app);
     std::ofstream fnames(OutDirectory + "/Fnames.txt", std::ofstream::out | std::ofstream::app);
     std::ofstream ftargets(OutDirectory + "/Ftargets.txt", std::ofstream::out | std::ofstream::app);
+    std::ofstream usedtargets(OutDirectory + "/UsedTargets.txt", std::ofstream::out | std::ofstream::app);
+
 
     /* Create dot-files directory */
     std::string dotfiles(OutDirectory + "/dot-files");
@@ -306,7 +310,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         for (auto &I : BB) {
           getDebugLoc(&I, filename, line);
-
           /* Don't worry about external libs */
           static const std::string Xlibs("/usr/");
           if (filename.empty() || line == 0 || !filename.compare(0, Xlibs.size(), Xlibs))
@@ -319,19 +322,21 @@ bool AFLCoverage::runOnModule(Module &M) {
           if (bb_name.empty()) 
             bb_name = filename + ":" + std::to_string(line);
           
-          if (!is_target) {
-            for (auto &target : targets) {
-              std::size_t found = target.find_last_of("/\\");
-              if (found != std::string::npos)
-                target = target.substr(found + 1);
+          for (auto &target : targets) { // list of targets from BBtargets.txt
+            std::size_t found = target.find_last_of("/\\");
+            if (found != std::string::npos)
+              target = target.substr(found + 1);
 
-              std::size_t pos = target.find_last_of(":");
-              std::string target_file = target.substr(0, pos);
-              unsigned int target_line = atoi(target.substr(pos + 1).c_str());
+            std::size_t pos = target.find_last_of(":");
+            std::string target_file = target.substr(0, pos);
+            unsigned int target_line = atoi(target.substr(pos + 1).c_str());
 
-              if (!target_file.compare(filename) && target_line == line)
-                is_target = true;
-
+            if (!target_file.compare(filename) && target_line == line) {
+              is_target = true;
+              std::string targetline = filename + ":" + std::to_string(line);
+              if (std::find(used_targets.begin(), used_targets.end(), targetline) == used_targets.end()) {
+                used_targets.push_back(targetline);
+              }
             }
           }
 
@@ -393,6 +398,11 @@ bool AFLCoverage::runOnModule(Module &M) {
         fnames << F.getName().str() << "\n";
       }
     }
+    // Save actual found lines in UsedTargets.txt
+    for (auto& file : used_targets) {
+      usedtargets << file << "\n";
+    }
+    OKF("Saved actually used target sites to $TMP/UsedTargets.txt.");
 
   } else {
     /* Distance instrumentation */
