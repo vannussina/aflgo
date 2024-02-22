@@ -133,7 +133,8 @@ void distance(
 
 std::vector<vertex_desc> cg_calculation(
     graph_t &G,
-    std::ifstream &target_stream
+    std::ifstream &target_stream,
+    std::ofstream &usedtargets_path
 ) {
     cout << "Loading targets..\n";
     std::vector<vertex_desc> targets;
@@ -143,8 +144,14 @@ std::vector<vertex_desc> cg_calculation(
             targets.push_back(t);
         }
     }
+    
+    for (auto& file : targets) {
+      usedtargets_path << file << "\n";
+    }
+
     if (targets.empty()) {
         cout << "No targets available\n";
+        usedtargets_path << "No targets available\n";
         exit(0);
     }
     return targets;
@@ -249,6 +256,9 @@ int main(int argc, char *argv[]) {
         cerr << "Exception of unknown type!\n";
     }
 
+    std::string temp_path = vm["targets"].as<std::string>().substr(0, vm["targets"].as<std::string>().size() - 12); // Ftargets.txt is 12 characters
+    std::ofstream usedtargets_path(temp_path + "/aflgo_used_targets.txt", std::ofstream::out | std::ofstream::app);
+
     std::ifstream dot = open_file(vm["dot"].as<std::string>());
     cout << "Parsing " << vm["dot"].as<std::string>() << " ..\n";
     graph_t graph(0);
@@ -274,7 +284,7 @@ int main(int argc, char *argv[]) {
     unordered_map<std::string, double> bb_distance;
 
     if (is_cg) {
-        targets = cg_calculation(graph, targets_stream);
+        targets = cg_calculation(graph, targets_stream, usedtargets_path);
     } else {
         if (not vm.count("cg_distance")) {
             cerr << "error: the required argument for option '--cg_distance' is missing\n";
